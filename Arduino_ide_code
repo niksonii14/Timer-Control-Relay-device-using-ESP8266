@@ -1,3 +1,10 @@
+#define BLYNK_TEMPLATE_ID "YOUR_BLYNK_TEMPLATE_ID"
+#define BLYNK_TEMPLATE_NAME "YOUR_BLYNK_TEMPLATE_NAME"
+#define BLYNK_PRINT Serial
+
+#include <ESP8266WiFi.h>
+#include <BlynkSimpleEsp8266.h>
+
 #include <Countimer.h>
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
@@ -8,12 +15,13 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
 
 // Pin definitions
 // const int ledPin = D8;
-const int bt_set = D4;
-const int bt_up = D5;
-const int bt_down = D6;
-const int bt_start = D7;
-const int relay = D0;
-const int buzzer = D3;
+const int bt_set = 2;
+const int bt_up = 14;
+const int bt_down = 12;
+const int bt_start = 13;
+const int relay = 16;
+const int buzzer = 0;
+
 
 // Timer
 Countimer tdown;
@@ -26,8 +34,17 @@ int time_h = 0;
 // State variables
 int set = 0;
 int flag1 = 0, flag2 = 0;
+char auth[] = "AUTH_TOKEN";
+char ssid[] = "YOUR_SSID";
+char pass[] = "YOUR_SSID_PASSWORD";
 
 void setup() {
+  // Debug console
+  Serial.begin(9600);
+
+  // Blynk initialization
+  Blynk.begin(auth, ssid, pass);
+
   // Pin modes
   pinMode(bt_set, INPUT_PULLUP);
   pinMode(bt_up, INPUT_PULLUP);
@@ -94,6 +111,7 @@ void buzz() {
 }
 
 void loop() {
+  Blynk.run();
   tdown.run();
 
   if (digitalRead(bt_set) == LOW) {
@@ -166,4 +184,37 @@ void eeprom_read() {
   time_s = EEPROM.read(0);
   time_m = EEPROM.read(1);
   time_h = EEPROM.read(2);
+}
+
+// Blynk virtual write functions
+BLYNK_WRITE(V1) {
+  flag2 = 1;
+  eeprom_read();
+  digitalWrite(relay, LOW);
+  tdown.restart();
+  tdown.start();
+}
+
+BLYNK_WRITE(V2) {
+  if (flag1 == 0) {
+    set = (set + 1) % 4;
+    flag1 = 1;
+    delay(200);
+  } else {
+    flag1 = 0;
+  }
+}
+
+BLYNK_WRITE(V3) {
+  if (set == 1) time_s = (time_s + 1) % 60;
+  if (set == 2) time_m = (time_m + 1) % 60;
+  if (set == 3) time_h = (time_h + 1) % 100;
+  eeprom_write();
+}
+
+BLYNK_WRITE(V4) {
+  if (set == 1) time_s = (time_s > 0) ? time_s - 1 : 59;
+  if (set == 2) time_m = (time_m > 0) ? time_m - 1 : 59;
+  if (set == 3) time_h = (time_h > 0) ? time_h - 1 : 99;
+  eeprom_write();
 }
